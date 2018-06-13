@@ -1,0 +1,16 @@
+# Copyright (c) 2016, NVIDIA CORPORATION.
+#
+# SPDX-License-Identifier: GPL-2.0
+
+if TARGET_MINIT
+
+config SYS_BOARD
+	default "minit"
+
+config SYS_VENDOR
+	default "ont"
+
+config SYS_CONFIG_NAME
+	default "minit"
+
+endif
