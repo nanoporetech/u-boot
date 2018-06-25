@@ -22,6 +22,8 @@
 #define CONFIG_GENERIC_MMC
 #define CONFIG_TEGRA_MMC
 
+#define CONFIG_BOOTCOMMAND "run led_white; run distro_bootcmd"
+
 /* Environment in eMMC, at the end of 2nd "boot sector" */
 #define CONFIG_ENV_IS_IN_MMC
 #define CONFIG_SYS_MMC_ENV_DEV		0
@@ -51,7 +53,12 @@
 	"pxefile_addr_r_size=00200000\0" \
 	"ramdisk_addr_r_align=00200000\0" \
 	"ramdisk_addr_r_offset=00000000\0" \
-	"ramdisk_addr_r_size=02000000\0"
+	"ramdisk_addr_r_size=02000000\0" \
+/* Above were copied from p2771-0000 */  \
+	"led_en=i2c mw 0x60 0x14.1 0xff 4\0" \
+	"led_on=i2c mw 0x60 0.1 0x21\0" \
+	"led_pwm=i2c mw 0x60 0x2.1 0x20 0x10\0" \
+	"led_white=i2c dev 2;run led_on;run led_en;run led_pwm\0" \
 
 #include "tegra-common-post.h"
 
