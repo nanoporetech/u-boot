@@ -1,0 +1,6 @@
+MINIT
+M:	Gavin Lofts <gavin.lofts@nanoporetech.com>
+S:	Maintained
+F:	board/ont/minit/
+F:	include/configs/minit.h
+F:	configs/minit_defconfig
