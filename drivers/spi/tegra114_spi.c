@@ -9,8 +9,13 @@
 #include <common.h>
 #include <dm.h>
 #include <asm/io.h>
+#ifdef CONFIG_TEGRA186
+#include <clk.h>
+#include <reset.h>
+#else
 #include <asm/arch/clock.h>
 #include <asm/arch-tegra/clk_rst.h>
+#endif
 #include <spi.h>
 #include <fdtdec.h>
 #include "tegra_spi.h"
@@ -92,18 +97,62 @@ struct tegra114_spi_priv {
 	struct spi_regs *regs;
 	unsigned int freq;
 	unsigned int mode;
+#ifdef CONFIG_TEGRA186
+	struct reset_ctl reset_ctl;
+	struct clk clk;
+#else
 	int periph_id;
+#endif
 	int valid;
 	int last_transaction_us;
 };
+
+#ifdef CONFIG_TEGRA186
+static int spi_init_clock(struct tegra114_spi_priv *priv, unsigned int freq)
+{
+        int ret;
+
+        ret = reset_assert(&priv->reset_ctl);
+        if (ret)
+                return ret;
+        ret = clk_enable(&priv->clk);
+        if (ret)
+                return ret;
+        ret = clk_set_rate(&priv->clk, freq);
+        if (IS_ERR_VALUE(ret))
+                return ret;
+	ret = reset_deassert(&priv->reset_ctl);
+        if (ret)
+                return ret;
+
+        return 0;
+}
+#endif
+
+
 
 static int tegra114_spi_ofdata_to_platdata(struct udevice *bus)
 {
 	struct tegra_spi_platdata *plat = bus->platdata;
 	const void *blob = gd->fdt_blob;
 	int node = bus->of_offset;
+#ifdef CONFIG_TEGRA186
+	int ret;
+#endif
 
 	plat->base = dev_get_addr(bus);
+#ifdef CONFIG_TEGRA186
+	ret = reset_get_by_name(bus, "spi", &plat->reset_ctl);
+	if (ret) {
+		error("reset_get_by_name() failed: %d\n", ret);
+		return ret;
+	}
+	ret = clk_get_by_name(bus, "div-clk", &plat->clk);
+	if (ret) {
+		error("clk_get_by_name() failed: %d\n", ret);
+		return ret;
+	}
+#else
 	plat->periph_id = clock_decode_periph_id(blob, node);
 
 	if (plat->periph_id == PERIPH_ID_NONE) {
@@ -111,14 +160,20 @@ static int tegra114_spi_ofdata_to_platdata(struct udevice *bus)
 		      plat->periph_id);
 		return -FDT_ERR_NOTFOUND;
 	}
-
+#endif
 	/* Use 500KHz as a suitable default */
 	plat->frequency = fdtdec_get_int(blob, node, "spi-max-frequency",
 					500000);
 	plat->deactivate_delay_us = fdtdec_get_int(blob, node,
 					"spi-deactivate-delay", 0);
 	debug("%s: base=%#08lx, periph_id=%d, max-frequency=%d, deactivate_delay=%d\n",
-	      __func__, plat->base, plat->periph_id, plat->frequency,
+	      __func__, plat->base, 
+#ifdef CONFIG_TEGRA186
+		-1,
+#else
+		plat->periph_id, 
+#endif
+		plat->frequency,
 	      plat->deactivate_delay_us);
 
 	return 0;
@@ -129,13 +184,20 @@ static int tegra114_spi_probe(struct udevice *bus)
 	struct tegra_spi_platdata *plat = dev_get_platdata(bus);
 	struct tegra114_spi_priv *priv = dev_get_priv(bus);
 	struct spi_regs *regs;
+#ifndef CONFIG_TEGRA186
 	ulong rate;
+#endif
 
 	priv->regs = (struct spi_regs *)plat->base;
 	regs = priv->regs;
 
 	priv->last_transaction_us = timer_get_us();
 	priv->freq = plat->frequency;
+#ifdef CONFIG_TEGRA186
+	priv->clk = plat->clk;
+	priv->reset_ctl = plat->reset_ctl;
+	spi_init_clock(priv, priv->freq);
+#else
 	priv->periph_id = plat->periph_id;
 
 	/*
@@ -152,7 +214,7 @@ static int tegra114_spi_probe(struct udevice *bus)
 			       bus->name, priv->freq, rate);
 		}
 	}
-
+#endif
 	/* Clear stale status here */
 	setbits_le32(&regs->fifo_status,
 		     SPI_FIFO_STS_ERR		|
