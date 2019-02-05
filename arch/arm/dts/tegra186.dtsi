@@ -58,6 +58,54 @@
 		status = "disabled";
 	};
 
+	spi1: spi@3210000 {
+                compatible = "nvidia,tegra186-spi", "nvidia,tegra114-spi";
+                reg = <0x0 0x03210000 0x0 0x1000>;
+                interrupts = <0 36 0x04>;
+                #address-cells = <1>;
+                #size-cells = <0>;
+                clocks = <&bpmp TEGRA186_CLK_SPI1>;
+                resets = <&bpmp TEGRA186_RESET_SPI1>;
+                reset-names = "spi";
+                status = "disabled";
+        };
+
+	spi2: spi@c260000 {
+                compatible = "nvidia,tegra186-spi", "nvidia,tegra114-spi";
+                reg = <0x0 0x0c260000 0x0 0x1000>;
+                interrupts = <0 37 0x04>;
+                #address-cells = <1>;
+                #size-cells = <0>;
+                clocks = <&bpmp TEGRA186_CLK_SPI2>;
+                resets = <&bpmp TEGRA186_RESET_SPI2>;
+                reset-names = "spi";
+                status = "disabled";
+        };
+
+	spi3: spi@3230000 {
+                compatible = "nvidia,tegra186-spi", "nvidia,tegra114-spi";
+                reg = <0x0 0x03230000 0x0 0x1000>;
+                interrupts = <0 38 0x04>;
+                #address-cells = <1>;
+                #size-cells = <0>;
+                clocks = <&bpmp TEGRA186_CLK_SPI3>;
+                resets = <&bpmp TEGRA186_RESET_SPI3>;
+                reset-names = "spi";
+                status = "disabled";
+        };
+	
+	spi4: spi@3240000 {
+                compatible = "nvidia,tegra186-spi", "nvidia,tegra114-spi";
+                reg = <0x0 0x03240000 0x0 0x1000>;
+                interrupts = <0 37 0x04>;
+                #address-cells = <1>;
+                #size-cells = <0>;
+                clocks = <&bpmp TEGRA186_CLK_SPI4>;
+                resets = <&bpmp TEGRA186_RESET_SPI4>;
+                reset-names = "spi";
+                status = "disabled";
+        };
+	
 	gen1_i2c: i2c@3160000 {
 		compatible = "nvidia,tegra186-i2c", "nvidia,tegra114-i2c";
 		reg = <0x0 0x3160000 0x0 0x100>;

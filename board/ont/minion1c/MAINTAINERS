@@ -1,6 +1,6 @@
-MINIT
+MINION1C
 M:	Gavin Lofts <gavin.lofts@nanoporetech.com>
 S:	Maintained
-F:	board/ont/minit/
-F:	include/configs/minit.h
-F:	configs/minit_defconfig
+F:	board/ont/minion1c/
+F:	include/configs/minion1c.h
+F:	configs/minion1c_defconfig
