@@ -14,4 +14,6 @@ struct tegra_spi_platdata {
 	int frequency;		/* Default clock frequency, -1 for none */
 	ulong base;
 	uint deactivate_delay_us;	/* Delay to wait after deactivate */
+	bool en_le_bit;
+	bool en_le_byte;
 };

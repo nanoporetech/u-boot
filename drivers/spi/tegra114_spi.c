@@ -105,6 +105,8 @@ struct tegra114_spi_priv {
 #endif
 	int valid;
 	int last_transaction_us;
+	bool en_le_bit;
+	bool en_le_byte;
 };
 
 #ifdef CONFIG_TEGRA186
@@ -161,12 +163,16 @@ static int tegra114_spi_ofdata_to_platdata(struct udevice *bus)
 		return -FDT_ERR_NOTFOUND;
 	}
 #endif
+
+	/*Default is big endian bit order, little endian byte order*/
+	plat->en_le_bit = fdtdec_get_int(blob, node, "spi-en-le-bit", 0);
+	plat->en_le_byte = fdtdec_get_int(blob, node, "spi-en-le-byte", 1);
 	/* Use 500KHz as a suitable default */
 	plat->frequency = fdtdec_get_int(blob, node, "spi-max-frequency",
 					500000);
 	plat->deactivate_delay_us = fdtdec_get_int(blob, node,
 					"spi-deactivate-delay", 0);
-	debug("%s: base=%#08lx, periph_id=%d, max-frequency=%d, deactivate_delay=%d\n",
+	debug("%s: base=%#08lx, periph_id=%d, max-frequency=%d, deactivate_delay=%d en_le_bit=%d, en_le_byte=%d",
 	      __func__, plat->base, 
 #ifdef CONFIG_TEGRA186
 		-1,
@@ -174,7 +180,7 @@ static int tegra114_spi_ofdata_to_platdata(struct udevice *bus)
 		plat->periph_id, 
 #endif
 		plat->frequency,
-	      plat->deactivate_delay_us);
+	      plat->deactivate_delay_us, plat->en_le_bit, plat->en_le_byte);
 
 	return 0;
 }
@@ -193,9 +199,15 @@ static int tegra114_spi_probe(struct udevice *bus)
 
 	priv->last_transaction_us = timer_get_us();
 	priv->freq = plat->frequency;
+	priv->en_le_byte = plat->en_le_byte;
+	priv->en_le_bit = plat->en_le_bit;
 #ifdef CONFIG_TEGRA186
 	priv->clk = plat->clk;
 	priv->reset_ctl = plat->reset_ctl;
+	/*
+	* Older devices fall back to oscillator input. New T186 code
+	* only operates from PLLP
+	*/
 	spi_init_clock(priv, priv->freq);
 #else
 	priv->periph_id = plat->periph_id;
@@ -229,7 +241,9 @@ static int tegra114_spi_probe(struct udevice *bus)
 	debug("%s: FIFO STATUS = %08x\n", __func__, readl(&regs->fifo_status));
 
 	setbits_le32(&priv->regs->command1, SPI_CMD1_M_S | SPI_CMD1_CS_SW_HW |
-		     (priv->mode << SPI_CMD1_MODE_SHIFT) | SPI_CMD1_CS_SW_VAL);
+		     (priv->mode << SPI_CMD1_MODE_SHIFT) | SPI_CMD1_CS_SW_VAL|
+			(priv->en_le_bit ? SPI_CMD1_LSBI_FE: 0) |
+			(priv->en_le_byte ? SPI_CMD1_LSBY_FE: 0));
 	debug("%s: COMMAND1 = %08x\n", __func__, readl(&regs->command1));
 
 	return 0;
@@ -309,7 +323,8 @@ static int tegra114_spi_xfer(struct udevice *dev, unsigned int bitlen,
 	writel(reg, &regs->fifo_status);
 
 	clrsetbits_le32(&regs->command1, SPI_CMD1_CS_SW_VAL,
-			SPI_CMD1_RX_EN | SPI_CMD1_TX_EN | SPI_CMD1_LSBY_FE |
+			SPI_CMD1_RX_EN | SPI_CMD1_TX_EN | (priv->en_le_byte ? SPI_CMD1_LSBY_FE: 0) |
+                        (priv->en_le_bit ? SPI_CMD1_LSBI_FE: 0) |
 			(spi_chip_select(dev) << SPI_CMD1_CS_SEL_SHIFT));
 
 	/* set xfer size to 1 block (32 bits) */
