@@ -22,7 +22,7 @@
 #define CONFIG_GENERIC_MMC
 #define CONFIG_TEGRA_MMC
 
-#define CONFIG_BOOTCOMMAND "run led_white; run distro_bootcmd"
+#define CONFIG_BOOTCOMMAND "run fpga_file_load; run fpga_load; run led_white; run distro_bootcmd"
 
 /* Environment in eMMC, at the end of 2nd "boot sector" */
 #define CONFIG_ENV_IS_IN_MMC
@@ -37,7 +37,7 @@
 
 #define BOARD_EXTRA_ENV_SETTINGS \
 	"calculated_vars=kernel_addr_r fdt_addr_r scriptaddr pxefile_addr_r " \
-		"ramdisk_addr_r\0" \
+		"ramdisk_addr_r fpgadata\0" \
 	"kernel_addr_r_align=00200000\0" \
 	"kernel_addr_r_offset=00080000\0" \
 	"kernel_addr_r_size=02000000\0" \
@@ -55,10 +55,16 @@
 	"ramdisk_addr_r_offset=00000000\0" \
 	"ramdisk_addr_r_size=02000000\0" \
 /* Above were copied from p2771-0000 */  \
+	"fpgadata_align=00100000\0" \
+	"fpgadata_offset=00000000\0" \
+	"fpgadata_size=00100000\0" \
 	"led_en=i2c mw 0x60 0x14.1 0xff 4\0" \
 	"led_on=i2c mw 0x60 0.1 0x21\0" \
 	"led_pwm=i2c mw 0x60 0x2.1 0x20 0x10\0" \
 	"led_white=i2c dev 2;run led_on;run led_en;run led_pwm\0" \
+	"fpga_file=/boot/fpga/top.rbf\0" \
+	"fpga_file_load=load mmc 0:1 $fpgadata $fpga_file\0" \
+	"fpga_load=fpga load 0 $fpgadata $filesize\0" \
 
 #include "tegra-common-post.h"
 
