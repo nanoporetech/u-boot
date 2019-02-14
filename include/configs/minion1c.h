@@ -68,4 +68,8 @@
 #undef CONFIG_NR_DRAM_BANKS
 #define CONFIG_NR_DRAM_BANKS	(1024 + 2)
 
+/* FPGA support (Cyclone IV) */
+#define CONFIG_FPGA
+#define CONFIG_FPGA_ALTERA
+#define CONFIG_FPGA_STRATIX_V
 #endif
