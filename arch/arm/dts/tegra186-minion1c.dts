@@ -10,6 +10,11 @@
 		cd-gpios = <&gpio_main TEGRA_MAIN_GPIO(P, 5) GPIO_ACTIVE_LOW>;
 		power-gpios = <&gpio_main TEGRA_MAIN_GPIO(P, 6) GPIO_ACTIVE_HIGH>;
 	};
+	spi@c260000 {
+                spi-max-frequency = <60000000>;
+		spi-en-le-bit = <1>;
+		spi-en-le-byte = <0>;
+        };
 
 	pcie-controller@10003000 {
 		status = "okay";
