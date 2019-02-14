@@ -20,8 +20,12 @@ config TARGET_MINIT
  	help
 	 ONT MinIT miniature computer 
 
-endchoice
+config TARGET_MINION1C
+	bool "ONT MINION1c"
+ 	help
+	 ONT portable DNA sequencer
 
+endchoice
 config SYS_SOC
 	default "tegra186"
 
@@ -30,5 +34,6 @@ config SYS_INIT_SP_BSS_OFFSET
 
 source "board/nvidia/p2771-0000/Kconfig"
 source "board/ont/minit/Kconfig"
+source "board/ont/minion1c/Kconfig"
 
 endif
