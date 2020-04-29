@@ -21,6 +21,8 @@
 #include <div64.h>
 #include "mmc_private.h"
 
+#define CONFIG_MMC_TRACE
+
 __weak int board_mmc_getwp(struct mmc *mmc)
 {
 	return -1;
