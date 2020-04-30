@@ -61,7 +61,7 @@
 	"led_en=i2c mw 0x60 0x14.1 0xff 4\0" \
 	"led_on=i2c mw 0x60 0.1 0x21\0" \
 	"led_pwm=i2c mw 0x60 0x2.1 0x20 0x10\0" \
-	"led_white=i2c dev 2;run led_on;run led_en;run led_pwm\0" \
+	"led_white=i2c dev 1;run led_on;run led_en;run led_pwm\0" \
 	"fpga_file=/boot/fpga/top.rbf\0" \
 	"fpga_file_load=load mmc 0:1 $fpgadata $fpga_file\0" \
 	"fpga_load=fpga load 0 $fpgadata $filesize\0" \
