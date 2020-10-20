@@ -1,6 +1,5 @@
 /*
- * (C) Copyright 2013-2017
- * NVIDIA Corporation <www.nvidia.com>
+ *  Copyright (c) 2013-2020, NVIDIA CORPORATION. All rights reserved.
  *
  * SPDX-License-Identifier:     GPL-2.0+
  */
@@ -41,13 +40,13 @@
  *   should not overlap that area, or the kernel will have to copy itself
  *   somewhere else before decompression. Similarly, the address of any other
  *   data passed to the kernel shouldn't overlap the start of RAM. Pushing
- *   this up to 16M allows for a sizable kernel to be decompressed below the
+ *   this up to 512K allows for a sizable kernel to be decompressed below the
  *   compressed load address.
  *
- * fdt_addr_r simply shouldn't overlap anything else. Choosing 32M allows for
+ * fdt_addr_r simply shouldn't overlap anything else. Choosing 40M allows for
  *   the compressed kernel to be up to 16M too.
  *
- * ramdisk_addr_r simply shouldn't overlap anything else. Choosing 33M allows
+ * ramdisk_addr_r simply shouldn't overlap anything else. Choosing 50M allows
  *   for the FDT/DTB to be up to 1M, which is hopefully plenty.
  */
 #define CONFIG_LOADADDR 0x80080000
@@ -55,9 +54,44 @@
 	"scriptaddr=0x90000000\0" \
 	"pxefile_addr_r=0x90100000\0" \
 	"kernel_addr_r=" __stringify(CONFIG_LOADADDR) "\0" \
-	"fdt_addr_r=0x82000000\0" \
+	"fdt_addr_r=0x83000000\0" \
 	"ramdisk_addr_r=0x83200000\0" \
-	"fdt_del_prop_paths=/pinmux@700008d4/pinctrl-names\0"
+	"calculated_vars=kernel_addr_r fdt_addr_r scriptaddr pxefile_addr_r " \
+		"ramdisk_addr_r\0" \
+	"kernel_addr_r_align=00200000\0" \
+	"kernel_addr_r_offset=00080000\0" \
+	"kernel_addr_r_size=08000000\0" \
+	"kernel_addr_r_aliases=loadaddr\0" \
+	"fdt_addr_r_align=00200000\0" \
+	"fdt_addr_r_offset=00000000\0" \
+	"fdt_addr_r_size=00200000\0" \
+	"scriptaddr_align=00200000\0" \
+	"scriptaddr_offset=00000000\0" \
+	"scriptaddr_size=00200000\0" \
+	"pxefile_addr_r_align=00200000\0" \
+	"pxefile_addr_r_offset=00000000\0" \
+	"pxefile_addr_r_size=00200000\0" \
+	"ramdisk_addr_r_align=00200000\0" \
+	"ramdisk_addr_r_offset=00000000\0" \
+	"ramdisk_addr_r_size=02000000\0" \
+	"fdt_del_prop_paths=/pinmux@700008d4/pinctrl-names\0" \
+	"fdt_copy_node_paths=" \
+		"/chosen/plugin-manager:" \
+		"/chosen/reset:" \
+		"/chosen/display-board:" \
+		"/chosen/proc-board:" \
+		"/chosen/pmu-board:" \
+		"/external-memory-controller@7001b000:" \
+		"/memory@80000000\0" \
+	"fdt_copy_prop_paths=" \
+		"/bpmp/carveout-start:" \
+		"/bpmp/carveout-size:" \
+		"/chosen/nvidia,ethernet-mac:" \
+		"/chosen/uuid:" \
+		"/chosen/linux,initrd-start:" \
+		"/chosen/linux,initrd-end:" \
+		"/psci/nvidia,system-lp0-disable:" \
+		"/serial-number\0"
 
 /* For USB EHCI controller */
 #define CONFIG_EHCI_IS_TDI
@@ -66,5 +100,8 @@
 
 /* GPU needs setup */
 #define CONFIG_TEGRA_GPU
+
+/* PMC secure access */
+#define CONFIG_ACCESS_PMC_VIA_SMC
 
 #endif /* _TEGRA210_COMMON_H_ */

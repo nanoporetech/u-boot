@@ -241,6 +241,9 @@ enum RTL8169_register_content {
 
 	/*_TBICSRBit*/
 	TBILinkOK = 0x02000000,
+
+	/* FuncEvent/Misc */
+	RxDv_Gated_En = 0x80000,
 };
 
 static struct {
@@ -262,6 +265,7 @@ static struct {
 	{"RTL-8168/8111g",	0x4c, 0xff7e1880,},
 	{"RTL-8101e",		0x34, 0xff7e1880,},
 	{"RTL-8100e",		0x32, 0xff7e1880,},
+	{"RTL-8168h/8111h",	0x54, 0xff7e1880,},
 };
 
 enum _DescStatusBit {
@@ -339,9 +343,6 @@ struct rtl8169_private {
 
 static struct rtl8169_private *tpc;
 
-static const u16 rtl8169_intr_mask =
-    SYSErr | PCSTimeout | RxUnderrun | RxOverflow | RxFIFOOver | TxErr |
-    TxOK | RxErr | RxOK;
 static const unsigned int rtl8169_rx_config =
     (RX_FIFO_THRESH << RxCfgFIFOShift) | (RX_DMA_BURST << RxCfgDMAShift);
 
@@ -948,6 +949,23 @@ static void rtl_halt(struct eth_device *dev)
 }
 #endif
 
+#ifdef CONFIG_DM_ETH
+static int rtl8169_write_hwaddr(struct udevice *dev)
+{
+	struct eth_pdata *plat = dev_get_platdata(dev);
+	unsigned int i;
+
+	RTL_W8(Cfg9346, Cfg9346_Unlock);
+
+	for (i = 0; i < MAC_ADDR_LEN; i++)
+		RTL_W8(MAC0 + i, plat->enetaddr[i]);
+
+	RTL_W8(Cfg9346, Cfg9346_Lock);
+
+	return 0;
+}
+#endif
+
 /**************************************************************************
 INIT - Look for an adapter, this routine's visible to the outside
 ***************************************************************************/
@@ -1194,6 +1212,19 @@ static int rtl8169_eth_probe(struct udevice *dev)
 		return ret;
 	}
 
+	/*
+	 * WAR for DHCP failure after rebooting from kernel.
+	 * Clear RxDv_Gated_En bit which was set by kernel driver.
+	 * Without this, U-Boot can't get an IP via DHCP.
+	 * Register (FuncEvent, aka MISC) and RXDV_GATED_EN bit are from
+	 * the r8169.c kernel driver.
+	 */
+
+	u32 val = RTL_R32(FuncEvent);
+	debug("%s: FuncEvent/Misc (0xF0) = 0x%08X\n", __func__, val);
+	val &= ~RxDv_Gated_En;
+	RTL_W32(FuncEvent, val);
+
 	return 0;
 }
 
@@ -1202,6 +1233,7 @@ static const struct eth_ops rtl8169_eth_ops = {
 	.send	= rtl8169_eth_send,
 	.recv	= rtl8169_eth_recv,
 	.stop	= rtl8169_eth_stop,
+	.write_hwaddr = rtl8169_write_hwaddr,
 };
 
 static const struct udevice_id rtl8169_eth_ids[] = {

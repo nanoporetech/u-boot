@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2017, NVIDIA CORPORATION.
+ * Copyright (c) 2010-2019, NVIDIA CORPORATION.
  *
  * SPDX-License-Identifier: GPL-2.0+
  */
@@ -29,8 +29,11 @@ int ft_system_setup(void *blob, bd_t *bd)
 			return ret;
 	}
 
-	fdt_del_env_nodelist(blob);
-	fdt_del_env_proplist(blob);
+	fdt_del_env_nodelist();
+	fdt_del_env_proplist();
+	fdt_copy_env_nodelist(blob);
+	fdt_copy_env_proplist(blob);
+	fdt_del_then_copy_env_nodelist(blob);
 
 	return 0;
 }

@@ -1,5 +1,5 @@
 /*
- * (C) Copyright 2013-2019
+ * (C) Copyright 2018-2019
  * NVIDIA Corporation <www.nvidia.com>
  *
  * SPDX-License-Identifier:     GPL-2.0+
@@ -7,10 +7,13 @@
 
 #include <common.h>
 #include <i2c.h>
+#include <libfdt.h>
 #include <pca953x.h>
 #include <asm/arch/gpio.h>
 #include <asm/arch/pinmux.h>
 #include "../p2571/max77620_init.h"
+
+#define ETH_ALEN 6
 
 void pin_mux_mmc(void)
 {
@@ -78,3 +81,61 @@ int tegra_pcie_board_init(void)
 }
 #endif /* PCI */
 
+/*
+ * Attempt to use /chosen/nvidia,ethernet-mac in the cboot DTB as U-Boot's
+ * ethaddr environment variable if possible.
+ */
+int set_ethaddr_from_cboot(const void *fdt)
+{
+	int node, len, err;
+	const uchar *mac;
+
+	/* Already a valid address in the environment? If so, keep it */
+	if (getenv("ethaddr"))
+		return 0;
+
+	node = fdt_path_offset(fdt, "/chosen");
+	if (node < 0) {
+		printf("Can't find /chosen node in CBoot DTB\n");
+		return node;
+	}
+	mac = fdt_getprop(fdt, node, "nvidia,ethernet-mac", &len);
+	if (!mac) {
+		printf("Can't find nvidia,ethernet-mac property in CBoot DTB\n");
+		return -ENOENT;
+	}
+
+	debug("%s: MAC address: %s\n", __func__, mac);
+
+	/* Set MAC address */
+	err = setenv("ethaddr", (void *)mac);
+	if (err) {
+		printf("Failed to set ethaddr from CBoot DTB: %d\n", err);
+		return err;
+	}
+
+	return 0;
+}
+
+int ft_board_setup(void *fdt, bd_t *bd)
+{
+	uchar mac[ETH_ALEN];
+	int node, err;
+
+	node = fdt_path_offset(fdt, "/pcie@1003000/pci@2,0/ethernet@0,0");
+	if (node < 0)
+		return 0;
+
+	debug("PCI ethernet device tree node found\n");
+
+	if (eth_getenv_enetaddr("ethaddr", mac)) {
+		err = fdt_setprop(fdt, node, "mac-address", mac, ETH_ALEN);
+		if (err < 0)
+			return 0;
+
+		debug("MAC address set: %02x:%02x:%02x:%02x:%02x:%02x\n",
+		      mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+	}
+
+	return 0;
+}

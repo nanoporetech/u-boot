@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012,2017 NVIDIA CORPORATION.  All rights reserved.
+ *  Copyright (c) 2012-2018, NVIDIA CORPORATION. All rights reserved.
  *
  * Derived from code (arch/arm/lib/reset.c) that is:
  *
@@ -33,7 +33,7 @@
 static int do_enterrcm(cmd_tbl_t *cmdtp, int flag, int argc,
 		       char * const argv[])
 {
-	u32 *pmc_scratch0;
+	u32 pmc_scratch0_offset;
 
 	puts("Entering RCM...\n");
 	udelay(50000);
@@ -43,13 +43,16 @@ static int do_enterrcm(cmd_tbl_t *cmdtp, int flag, int argc,
 	 * T186 has moved the scratch regs. Address the reg directly here
 	 * rather than creating a new pmc reg struct for just one register.
 	 */
-	pmc_scratch0 = (u32 *)(NV_PA_PMC_BASE + 0x32000);
+	pmc_scratch0_offset = 0x32000;
 #else
-	struct pmc_ctlr *pmc = (struct pmc_ctlr *)NV_PA_PMC_BASE;
-	pmc_scratch0 = &pmc->pmc_scratch0;
+	pmc_scratch0_offset = offsetof(struct pmc_ctlr, pmc_scratch0);
 #endif
-	writel(2, pmc_scratch0);	/* SCRATCH0, bit 1 */
+
+	tegra_pmc_writel(2, pmc_scratch0_offset);
+
 	disable_interrupts();
+
+	/* reset_cpu */
 	reset_cpu(0);
 
 	return 0;

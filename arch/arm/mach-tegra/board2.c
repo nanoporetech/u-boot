@@ -1,10 +1,9 @@
 /*
- *  (C) Copyright 2010,2011,2015,2017
+ *  (C) Copyright 2010,2011,2015,2017,2019
  *  NVIDIA Corporation <www.nvidia.com>
  *
  * SPDX-License-Identifier:	GPL-2.0+
  */
-
 #include <common.h>
 #include <dm.h>
 #include <errno.h>
@@ -213,6 +212,31 @@ int board_early_init_f(void)
 #endif
 		arch_timer_init();
 
+#if defined(CONFIG_DISABLE_SDMMC1_EARLY)
+	/*
+	 * Turn off (reset/disable) SDMMC1 on Porg here, before GPIO INIT.
+	 * We do this because earlier bootloaders have enabled power to
+	 * SDMMC1 on Porg/Nano, and toggling power-gpio (PZ3) in
+	 * pinmux_init() results in power being back-driven into the
+	 * SD-card and SDMMC1 HW, which is 'bad' as per HW.
+         *
+	 * From the HW team: "LDO2 from the PMIC has already been set for 3.3v in
+         * nvtboot/CBoot on Porg (for SD-card boot). So when U-Boot's GPIO_INIT
+         * table sets PZ3 to OUT0 as per the pinmux spreadsheet, it turns off
+         * the loadswitch. When PZ3 is 0 and not driving, essentially the SD card
+         * voltage turns off. Since the SDCard voltage is no longer there, the
+         * SDMMC CLK/DAT lines are backdriving into what essentially is a powered-
+         * off SDCard, that's why the voltage drops from 3.3V to 1.6V-ish"
+         *
+	 * Note that this can probably be removed when we change over to storing
+	 * all BL components on QSPI on Porg/Nano, and U-Boot then becomes the
+	 * first one to turn on SDMMC1 power. Another fix would be to have CBoot
+         * disable power/gate SDMMC1 off before handing off to U-Boot/kernel.
+	 */
+	reset_set_enable(PERIPH_ID_SDMMC1, 1);
+	clock_set_enable(PERIPH_ID_SDMMC1, 0);
+#endif	/* CONFIG_DISABLE_SDMMC1_EARLY */
+
 	pinmux_init();
 	board_init_uart_f();
 
@@ -263,12 +287,14 @@ int board_mmc_init(bd_t *bd)
 
 void pad_init_mmc(struct mmc_host *host)
 {
-#if defined(CONFIG_TEGRA30)
+#if defined(CONFIG_TEGRA30) || defined(CONFIG_TEGRA210)
 	enum periph_id id = host->mmc_id;
 	u32 val;
+	u16 clk_con;
+	int timeout;
 
-	debug("%s: sdmmc address = %08x, id = %d\n", __func__,
-		(unsigned int)host->reg, id);
+	debug("%s: sdmmc address = %p, id = %d\n", __func__,
+		host->reg, id);
 
 	/* Set the pad drive strength for SDMMC1 or 3 only */
 	if (id != PERIPH_ID_SDMMC1 && id != PERIPH_ID_SDMMC3) {
@@ -281,12 +307,68 @@ void pad_init_mmc(struct mmc_host *host)
 	val &= 0xFFFFFFF0;
 	val |= MEMCOMP_PADCTRL_VREF;
 	writel(val, &host->reg->sdmemcmppadctl);
+	debug("%s: SD_MEM_COMP_PAD_CTL = 0x%08X\n", __func__, val);
+
+	/* Disable SD Clock Enable before running auto-cal as per TRM */
+	clk_con = readw(&host->reg->clkcon);
+	debug("%s: CLOCK_CONTROL = 0x%04X\n", __func__, clk_con);
+	clk_con &= ~TEGRA_MMC_CLKCON_SD_CLOCK_ENABLE;
+	writew(clk_con, &host->reg->clkcon);
 
 	val = readl(&host->reg->autocalcfg);
 	val &= 0xFFFF0000;
-	val |= AUTO_CAL_PU_OFFSET | AUTO_CAL_PD_OFFSET | AUTO_CAL_ENABLED;
+	val |= AUTO_CAL_PU_OFFSET | AUTO_CAL_PD_OFFSET;
 	writel(val, &host->reg->autocalcfg);
-#endif	/* T30 */
+	val |= AUTO_CAL_START | AUTO_CAL_ENABLE;
+	writel(val, &host->reg->autocalcfg);
+	debug("%s: AUTO_CAL_CFG = 0x%08X\n", __func__, val);
+	udelay(1);
+
+	timeout = 100;				/* 10 mSec max (100*100uS) */
+	do {
+		val = readl(&host->reg->autocalsts);
+		udelay(100);
+	} while ((val & AUTO_CAL_ACTIVE) && --timeout);
+	val = readl(&host->reg->autocalsts);
+	debug("%s: Final AUTO_CAL_STATUS = 0x%08X, timeout = %d\n",
+	      __func__, val, timeout);
+
+	/* Re-enable SD Clock Enable when auto-cal is done */
+	clk_con |= TEGRA_MMC_CLKCON_SD_CLOCK_ENABLE;
+	writew(clk_con, &host->reg->clkcon);
+	clk_con = readw(&host->reg->clkcon);
+	debug("%s: final CLOCK_CONTROL = 0x%04X\n", __func__, clk_con);
+
+	if (timeout == 0) {
+		printf("%s: Warning: Autocal timed out!\n", __func__);
+		/* TBD: Set CFG2TMC_SDMMC1_PAD_CAL_DRV* regs here */
+	}
+
+#if defined(CONFIG_TEGRA210)
+	u32 tap_value, trim_value;
+
+	/* Set tap/trim values for SDMMC1/3 @ <48MHz here */
+	val = readl(&host->reg->venspictl);	/* aka VENDOR_SYS_SW_CNTL */
+	val &= IO_TRIM_BYPASS_MASK;
+	if (id == PERIPH_ID_SDMMC1) {
+		tap_value = 4;			/* default */
+		if (val)
+			tap_value = 3;
+		trim_value = 2;
+	} else {				/* SDMMC3 */
+		tap_value = 3;
+		trim_value = 3;
+	}
+
+	val = readl(&host->reg->venclkctl);
+	val &= ~TRIM_VAL_MASK;
+	val |= (trim_value << TRIM_VAL_SHIFT);
+	val &= ~TAP_VAL_MASK;
+	val |= (tap_value << TAP_VAL_SHIFT);
+	writel(val, &host->reg->venclkctl);
+	debug("%s: VENDOR_CLOCK_CNTRL = 0x%08X\n", __func__, val);
+#endif	/* T210 */
+#endif	/* T30/T210 */
 }
 #endif	/* MMC */
 
